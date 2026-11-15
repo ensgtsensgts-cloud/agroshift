@@ -1,0 +1,729 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>AgroRisk v2 — منصة الذكاء الاصطناعي للفلاحة</title>
+
+<!-- Fonts -->
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;900&family=Poppins:wght@400;600;700;900&display=swap" rel="stylesheet">
+<!-- Leaflet -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<!-- Chart.js -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<!-- jsPDF + html2canvas (للتصدير PDF) -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<!-- Font Awesome -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/>
+
+<style>
+:root{
+  --green1:#0f9d58; --green2:#34a853; --green3:#16a34a;
+  --blue1:#1e3a8a; --blue2:#2563eb;
+  --bg:#0b1220; --bg2:#0f172a; --card:rgba(255,255,255,0.06);
+  --text:#e6edf7; --muted:#94a3b8;
+  --good:#22c55e; --warn:#f59e0b; --bad:#ef4444; --info:#3b82f6;
+  --radius:18px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{
+  font-family:'Cairo','Poppins',sans-serif;
+  background:
+    radial-gradient(1200px 600px at 10% -10%, rgba(34,197,94,.18), transparent 60%),
+    radial-gradient(1000px 500px at 110% 10%, rgba(37,99,235,.18), transparent 60%),
+    linear-gradient(180deg,var(--bg),var(--bg2));
+  color:var(--text); min-height:100vh; overflow-x:hidden;
+}
+[dir="ltr"] body{font-family:'Poppins','Cairo',sans-serif}
+
+/* ===== Navbar ===== */
+.navbar{
+  position:sticky; top:0; z-index:50;
+  display:flex; align-items:center; justify-content:space-between;
+  padding:14px 28px;
+  background:rgba(11,18,32,.75); backdrop-filter:blur(14px);
+  border-bottom:1px solid rgba(255,255,255,.08);
+}
+.logo{display:flex;align-items:center;gap:10px;font-weight:900;font-size:22px}
+.logo i{color:var(--green2);font-size:26px}
+.logo span b{background:linear-gradient(90deg,var(--green2),var(--blue2));-webkit-background-clip:text;background-clip:text;color:transparent}
+.nav-links{display:flex;gap:22px;align-items:center}
+.nav-links a{color:var(--muted);text-decoration:none;font-weight:600;transition:.2s}
+.nav-links a:hover{color:var(--text)}
+.lang-btn{
+  background:linear-gradient(135deg,var(--green2),var(--blue2));
+  color:#fff;border:none;padding:8px 16px;border-radius:999px;
+  font-weight:700;cursor:pointer;
+}
+
+/* ===== Hero ===== */
+.hero{
+  display:grid; grid-template-columns:1.1fr 1fr; gap:30px;
+  padding:40px 28px 20px; align-items:stretch;
+}
+.hero-text h1{
+  font-size:clamp(28px,4vw,52px); font-weight:900; line-height:1.15; margin-bottom:14px;
+}
+.hero-text h1 b{background:linear-gradient(90deg,#22c55e,#3b82f6);-webkit-background-clip:text;background-clip:text;color:transparent}
+.hero-text p{color:var(--muted);font-size:17px;line-height:1.7;margin-bottom:22px;max-width:560px}
+.hero-cta{display:flex;gap:12px;flex-wrap:wrap}
+.btn{
+  display:inline-flex;align-items:center;gap:8px;
+  padding:12px 20px;border-radius:12px;font-weight:700;cursor:pointer;border:none;
+  transition:transform .15s, box-shadow .2s;
+}
+.btn-primary{background:linear-gradient(135deg,var(--green2),var(--green3));color:#fff;box-shadow:0 8px 24px rgba(34,197,94,.35)}
+.btn-primary:hover{transform:translateY(-2px)}
+.btn-ghost{background:rgba(255,255,255,.06);color:var(--text);border:1px solid rgba(255,255,255,.12)}
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:26px}
+.stat{background:var(--card);border:1px solid rgba(255,255,255,.08);border-radius:14px;padding:14px}
+.stat .v{font-size:22px;font-weight:900;color:#fff}
+.stat .l{font-size:12px;color:var(--muted);margin-top:4px}
+.stat .d{font-size:11px;color:var(--good);margin-top:2px}
+
+/* ===== Map panel ===== */
+.map-panel{
+  position:relative; border-radius:var(--radius); overflow:hidden;
+  border:1px solid rgba(255,255,255,.1);
+  min-height:460px; box-shadow:0 20px 60px rgba(0,0,0,.4);
+}
+#map{height:100%;min-height:460px;background:#0b1220}
+.map-tools{
+  position:absolute; top:14px; inset-inline-start:14px; z-index:10;
+  display:flex;flex-direction:column;gap:8px;
+}
+.map-tools .tool{
+  background:rgba(15,23,42,.85);backdrop-filter:blur(10px);
+  border:1px solid rgba(255,255,255,.1); color:#fff;
+  width:44px;height:44px;border-radius:12px;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;font-size:18px;
+  transition:.2s;
+}
+.map-tools .tool:hover{background:var(--green2)}
+.map-tools .tool.active{background:var(--green2);box-shadow:0 0 0 3px rgba(34,197,94,.3)}
+.map-legend{
+  position:absolute; bottom:14px; inset-inline-end:14px; z-index:10;
+  background:rgba(15,23,42,.85);backdrop-filter:blur(10px);
+  border:1px solid rgba(255,255,255,.1); border-radius:12px;
+  padding:10px 12px; font-size:12px; color:var(--muted);
+}
+
+/* ===== Sections ===== */
+section.block{padding:30px 28px}
+.section-title{
+  text-align:center;margin-bottom:24px;
+}
+.section-title h2{font-size:32px;font-weight:900}
+.section-title h2 b{background:linear-gradient(90deg,#22c55e,#3b82f6);-webkit-background-clip:text;background-clip:text;color:transparent}
+.section-title p{color:var(--muted);margin-top:8px}
+
+/* ===== Analysis panel ===== */
+.analysis-wrap{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+.card{
+  background:var(--card); border:1px solid rgba(255,255,255,.08);
+  border-radius:var(--radius); padding:20px; backdrop-filter:blur(10px);
+}
+.card h3{display:flex;align-items:center;gap:10px;margin-bottom:14px;font-size:18px}
+.card h3 i{color:var(--green2)}
+
+/* Prediction big card */
+.pred-card{
+  background:linear-gradient(135deg,rgba(34,197,94,.12),rgba(37,99,235,.12));
+  border:1px solid rgba(255,255,255,.12);
+}
+.pred-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px}
+.pred-badge{
+  padding:8px 16px;border-radius:999px;font-weight:800;font-size:14px;
+}
+.pred-badge.good{background:rgba(34,197,94,.18);color:var(--good);border:1px solid rgba(34,197,94,.4)}
+.pred-badge.warn{background:rgba(245,158,11,.18);color:var(--warn);border:1px solid rgba(245,158,11,.4)}
+.pred-badge.bad{background:rgba(239,68,68,.18);color:var(--bad);border:1px solid rgba(239,68,68,.4)}
+.pred-badge.fungal{background:rgba(168,85,247,.18);color:#a855f7;border:1px solid rgba(168,85,247,.4)}
+.conf-bar{height:8px;background:rgba(255,255,255,.08);border-radius:999px;overflow:hidden;margin-top:8px}
+.conf-bar > div{height:100%;background:linear-gradient(90deg,var(--green2),var(--blue2));border-radius:999px}
+
+/* Indicators */
+.ind-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}
+.ind{
+  background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);
+  border-radius:14px;padding:14px;position:relative;overflow:hidden;
+}
+.ind .t{font-size:13px;color:var(--muted);margin-bottom:6px}
+.ind .v{font-size:22px;font-weight:900}
+.ind .n{font-size:12px;color:var(--muted);margin-top:4px}
+.ind .dot{position:absolute;top:14px;inset-inline-end:14px;width:10px;height:10px;border-radius:50%}
+.ind.good .dot{background:var(--good);box-shadow:0 0 10px var(--good)}
+.ind.warn .dot{background:var(--warn);box-shadow:0 0 10px var(--warn)}
+.ind.bad .dot{background:var(--bad);box-shadow:0 0 10px var(--bad)}
+.ind.info .dot{background:var(--info);box-shadow:0 0 10px var(--info)}
+
+/* Recommendations */
+.rec-list{list-style:none;display:flex;flex-direction:column;gap:10px}
+.rec-list li{
+  display:flex;gap:10px;align-items:flex-start;
+  background:rgba(255,255,255,.04);padding:12px;border-radius:12px;
+  border-inline-start:3px solid var(--green2);
+}
+.rec-list li i{color:var(--green2);margin-top:4px}
+
+/* Warnings */
+.warn-list{display:flex;flex-direction:column;gap:10px}
+.warn-item{
+  background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.25);
+  padding:12px;border-radius:12px;font-size:14px;color:#fcd34d;
+  display:flex;gap:10px;align-items:flex-start;
+}
+.warn-item i{color:var(--warn);margin-top:3px}
+
+/* Chart */
+.chart-wrap{position:relative;height:260px}
+
+/* Actions bar */
+.actions-bar{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px}
+
+/* Empty state */
+.empty{
+  text-align:center;padding:40px 20px;color:var(--muted);
+}
+.empty i{font-size:48px;color:var(--green2);opacity:.4;margin-bottom:12px}
+
+/* Loader */
+.loader{display:none;align-items:center;gap:10px;color:var(--muted)}
+.loader.active{display:flex}
+.loader .spin{
+  width:18px;height:18px;border:3px solid rgba(255,255,255,.15);
+  border-top-color:var(--green2);border-radius:50%;animation:sp 1s linear infinite;
+}
+@keyframes sp{to{transform:rotate(360deg)}}
+
+/* Footer */
+footer{
+  padding:30px 28px;text-align:center;color:var(--muted);
+  border-top:1px solid rgba(255,255,255,.08);margin-top:30px;
+}
+
+/* Responsive */
+@media (max-width:960px){
+  .hero,.analysis-wrap{grid-template-columns:1fr}
+  .stats{grid-template-columns:repeat(2,1fr)}
+  .ind-grid{grid-template-columns:1fr}
+}
+
+/* Toast */
+.toast{
+  position:fixed;bottom:20px;inset-inline-end:20px;z-index:100;
+  background:rgba(15,23,42,.95);backdrop-filter:blur(10px);
+  border:1px solid rgba(255,255,255,.1);border-radius:12px;
+  padding:14px 18px;color:#fff;max-width:340px;
+  transform:translateY(100px);opacity:0;transition:.3s;
+}
+.toast.show{transform:translateY(0);opacity:1}
+.toast.error{border-color:rgba(239,68,68,.4)}
+.toast.success{border-color:rgba(34,197,94,.4)}
+
+/* Print hidden */
+@media print{.navbar,.map-panel,.hero-cta,.actions-bar,.nav-links{display:none!important}}
+</style>
+</head>
+<body>
+
+<!-- ===== Navbar ===== -->
+<nav class="navbar">
+  <div class="logo">
+    <i class="fa-solid fa-seedling"></i>
+    <span>Agro<b>Risk</b> <small style="color:var(--muted);font-weight:600">v2</small></span>
+  </div>
+  <div class="nav-links">
+    <a href="#home" data-i18n="nav.home">الرئيسية</a>
+    <a href="#platform" data-i18n="nav.platform">المنصة</a>
+    <a href="#solutions" data-i18n="nav.solutions">الحلول</a>
+    <a href="#contact" data-i18n="nav.contact">اتصل بنا</a>
+    <button class="lang-btn" id="langBtn">FR</button>
+  </div>
+</nav>
+
+<!-- ===== Hero ===== -->
+<header class="hero" id="home">
+  <div class="hero-text">
+    <h1 data-i18n="hero.title">منصة <b>الذكاء الاصطناعي</b> لمراقبة الحقول الزراعية 🌱</h1>
+    <p data-i18n="hero.sub">ارسم حقلك على الخريطة، وسيقوم النظام بتحليل صور الأقمار الاصطناعية (NDVI، VCI، الحرارة، الأمطار، رطوبة التربة) ليُعطيك تشخيصاً فورياً وتوصيات عملية.</p>
+    <div class="hero-cta">
+      <button class="btn btn-primary" onclick="document.getElementById('platform').scrollIntoView({behavior:'smooth'})">
+        <i class="fa-solid fa-map-location-dot"></i> <span data-i18n="hero.cta1">استكشف الخريطة</span>
+      </button>
+      <button class="btn btn-ghost" onclick="alert('قريباً: فيديو تعريفي')">
+        <i class="fa-solid fa-play"></i> <span data-i18n="hero.cta2">شاهد العرض</span>
+      </button>
+    </div>
+    <div class="stats">
+      <div class="stat"><div class="v">5</div><div class="l" data-i18n="stat.layers">طبقات بيانات</div><div class="d">NDVI • VCI • LST • Rain • SMAP</div></div>
+      <div class="stat"><div class="v">10+</div><div class="l" data-i18n="stat.years">سنوات من البيانات</div><div class="d">2016 → 2026</div></div>
+      <div class="stat"><div class="v">4</div><div class="l" data-i18n="stat.classes">حالات يُشخّصها</div><div class="d" data-i18n="stat.classes_d">جيد • إجهاد • جفاف • فطريات</div></div>
+      <div class="stat"><div class="v">2</div><div class="l" data-i18n="stat.langs">لغتان</div><div class="d">العربية • Français</div></div>
+    </div>
+  </div>
+
+  <!-- Map -->
+  <div class="map-panel" id="platform">
+    <div id="map"></div>
+    <div class="map-tools">
+      <button class="tool" id="drawBtn" title="رسم حقل"><i class="fa-solid fa-draw-polygon"></i></button>
+      <button class="tool" id="clearBtn" title="مسح"><i class="fa-solid fa-trash"></i></button>
+      <button class="tool" id="analyzeBtn" title="تحليل" style="background:linear-gradient(135deg,var(--green2),var(--blue2))"><i class="fa-solid fa-magnifying-glass-chart"></i></button>
+      <button class="tool" id="pdfBtn" title="PDF"><i class="fa-solid fa-file-pdf"></i></button>
+    </div>
+    <div class="map-legend">
+      <i class="fa-solid fa-circle-info"></i>
+      <span data-i18n="map.legend">اسحب لرسم حدود الحقل ثم اضغط تحليل</span>
+    </div>
+  </div>
+</header>
+
+<!-- ===== Analysis results ===== -->
+<section class="block" id="results" style="display:none">
+  <div class="section-title">
+    <h2 data-i18n="res.title">نتائج <b>التحليل</b></h2>
+    <p id="resSubtitle"></p>
+  </div>
+
+  <div class="analysis-wrap" id="reportArea">
+    <!-- Prediction card -->
+    <div class="card pred-card">
+      <div class="pred-head">
+        <h3><i class="fa-solid fa-stethoscope"></i> <span data-i18n="res.diag">التشخيص</span></h3>
+        <span class="pred-badge" id="predBadge">—</span>
+      </div>
+      <div style="font-size:15px;line-height:1.7;color:var(--text)" id="predSummary">—</div>
+      <div style="margin-top:12px">
+        <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--muted)">
+          <span data-i18n="res.conf">ثقة النموذج</span>
+          <span id="confText">—</span>
+        </div>
+        <div class="conf-bar"><div id="confFill" style="width:0%"></div></div>
+      </div>
+      <div style="margin-top:14px;font-size:13px;color:var(--muted)">
+        <span data-i18n="res.area">المساحة:</span> <b id="areaText">—</b> &nbsp;|&nbsp;
+        <span data-i18n="res.month">الشهر:</span> <b id="monthText">—</b>
+      </div>
+    </div>
+
+    <!-- Indicators -->
+    <div class="card">
+      <h3><i class="fa-solid fa-chart-line"></i> <span data-i18n="res.ind">المؤشرات</span></h3>
+      <div class="ind-grid" id="indGrid"></div>
+    </div>
+
+    <!-- Chart -->
+    <div class="card">
+      <h3><i class="fa-solid fa-wave-square"></i> <span data-i18n="res.series">السلاسل الزمنية (12 شهراً)</span></h3>
+      <div class="chart-wrap"><canvas id="tsChart"></canvas></div>
+    </div>
+
+    <!-- Recommendations -->
+    <div class="card">
+      <h3><i class="fa-solid fa-lightbulb"></i> <span data-i18n="res.rec">التوصيات</span></h3>
+      <ul class="rec-list" id="recList"></ul>
+    </div>
+  </div>
+
+  <!-- Warnings -->
+  <div class="card" id="warnCard" style="margin-top:20px;display:none">
+    <h3><i class="fa-solid fa-triangle-exclamation" style="color:var(--warn)"></i> <span data-i18n="res.warn">تنبيهات</span></h3>
+    <div class="warn-list" id="warnList"></div>
+  </div>
+
+  <!-- Actions -->
+  <div class="actions-bar">
+    <button class="btn btn-primary" id="downloadPdf"><i class="fa-solid fa-file-pdf"></i> <span data-i18n="res.pdf">تحميل PDF</span></button>
+    <button class="btn btn-ghost" id="downloadJson"><i class="fa-solid fa-file-code"></i> JSON</button>
+    <button class="btn btn-ghost" id="redrawBtn"><i class="fa-solid fa-rotate-right"></i> <span data-i18n="res.redraw">رسم حقل جديد</span></button>
+  </div>
+</section>
+
+<!-- Loader -->
+<div class="loader" id="loader"><div class="spin"></div><span data-i18n="loading">جاري التحليل...</span></div>
+
+<!-- Footer -->
+<footer id="contact">
+  <p>🌱 AgroRisk v2 — <span data-i18n="foot.tag">منصة ذكية للفلاحة المستدامة</span></p>
+  <p style="margin-top:6px;font-size:13px">© 2026 — Maghnia, Algérie 🇩🇿</p>
+</footer>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<script>
+/* ================= i18n ================= */
+const I18N = {
+  ar:{
+    "nav.home":"الرئيسية","nav.platform":"المنصة","nav.solutions":"الحلول","nav.contact":"اتصل بنا",
+    "hero.title":"منصة <b>الذكاء الاصطناعي</b> لمراقبة الحقول الزراعية 🌱",
+    "hero.sub":"ارسم حقلك على الخريطة، وسيقوم النظام بتحليل صور الأقمار الاصطناعية (NDVI، VCI، الحرارة، الأمطار، رطوبة التربة) ليُعطيك تشخيصاً فورياً وتوصيات عملية.",
+    "hero.cta1":"استكشف الخريطة","hero.cta2":"شاهد العرض",
+    "stat.layers":"طبقات بيانات","stat.years":"سنوات من البيانات","stat.classes":"حالات يُشخّصها",
+    "stat.classes_d":"جيد • إجهاد • جفاف • فطريات","stat.langs":"لغتان",
+    "map.legend":"اسحب لرسم حدود الحقل ثم اضغط تحليل",
+    "res.title":"نتائج <b>التحليل</b>","res.diag":"التشخيص","res.conf":"ثقة النموذج",
+    "res.area":"المساحة:","res.month":"الشهر:","res.ind":"المؤشرات",
+    "res.series":"السلاسل الزمنية (12 شهراً)","res.rec":"التوصيات","res.warn":"تنبيهات",
+    "res.pdf":"تحميل PDF","res.redraw":"رسم حقل جديد",
+    "loading":"جاري التحليل...","foot.tag":"منصة ذكية للفلاحة المستدامة",
+    "toast.draw":"ارسم مضلّعاً على الخريطة أولاً",
+    "toast.ok":"تم التحليل بنجاح ✅","toast.err":"خطأ في التحليل",
+    "toast.pdf":"جاري إنشاء PDF..."
+  },
+  fr:{
+    "nav.home":"Accueil","nav.platform":"Plateforme","nav.solutions":"Solutions","nav.contact":"Contact",
+    "hero.title":"Plateforme <b>d'IA</b> pour la surveillance des champs 🌱",
+    "hero.sub":"Dessinez votre parcelle sur la carte : le système analyse les images satellites (NDVI, VCI, température, pluie, humidité du sol) et vous donne un diagnostic instantané avec des recommandations pratiques.",
+    "hero.cta1":"Explorer la carte","hero.cta2":"Voir la démo",
+    "stat.layers":"Couches de données","stat.years":"Années de données","stat.classes":"États diagnostiqués",
+    "stat.classes_d":"Bon • Stress • Sécheresse • Champignons","stat.langs":"Langues",
+    "map.legend":"Dessinez la parcelle puis cliquez sur Analyser",
+    "res.title":"Résultats de <b>l'analyse</b>","res.diag":"Diagnostic","res.conf":"Confiance du modèle",
+    "res.area":"Surface :","res.month":"Mois :","res.ind":"Indicateurs",
+    "res.series":"Séries temporelles (12 mois)","res.rec":"Recommandations","res.warn":"Avertissements",
+    "res.pdf":"Télécharger PDF","res.redraw":"Nouvelle parcelle",
+    "loading":"Analyse en cours...","foot.tag":"Plateforme intelligente pour une agriculture durable",
+    "toast.draw":"Dessinez d'abord un polygone sur la carte",
+    "toast.ok":"Analyse réussie ✅","toast.err":"Erreur d'analyse",
+    "toast.pdf":"Création du PDF..."
+  }
+};
+let LANG = "ar";
+function applyLang(){
+  document.documentElement.lang = LANG;
+  document.documentElement.dir = LANG==="ar" ? "rtl" : "ltr";
+  document.getElementById("langBtn").textContent = LANG==="ar" ? "FR" : "AR";
+  document.querySelectorAll("[data-i18n]").forEach(el=>{
+    const k = el.getAttribute("data-i18n");
+    if(I18N[LANG][k]) el.innerHTML = I18N[LANG][k];
+  });
+}
+document.getElementById("langBtn").onclick = ()=>{ LANG = LANG==="ar"?"fr":"ar"; applyLang(); };
+
+/* ================= Map ================= */
+const map = L.map('map',{zoomControl:true}).setView([35.0100, -1.7400], 13); // Maghnia
+// Tiles: no API key needed. Satellite is the default (best for farmland);
+// the layer switcher (top-right) also offers a dark map and OpenStreetMap.
+const satellite = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{
+  attribution:'Tiles © Esri', maxZoom:19
+}).addTo(map);
+const darkMap = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}',{
+  attribution:'Tiles © Esri', maxZoom:16
+});
+const osmMap = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{
+  attribution:'© OpenStreetMap', maxZoom:19   // may be blocked on file://; works over http (Live Server)
+});
+L.control.layers({'🛰 قمر صناعي':satellite,'🌑 داكنة':darkMap,'🗺 OpenStreetMap':osmMap}).addTo(map);
+setTimeout(()=>map.invalidateSize(), 300);
+
+let drawnLayer = null;
+let drawing = false, currentPoints = [];
+let tempLine = null;
+
+document.getElementById("drawBtn").onclick = ()=>{
+  drawing = !drawing;
+  document.getElementById("drawBtn").classList.toggle("active", drawing);
+  if(drawing){
+    currentPoints = [];
+    if(drawnLayer){ map.removeLayer(drawnLayer); drawnLayer=null; }
+    if(tempLine){ map.removeLayer(tempLine); tempLine=null; }
+    toast(LANG==="ar"?"انقر على الخريطة لرسم النقاط، ثم انقر على أول نقطة للإغلاق":"Cliquez pour dessiner, puis sur le 1er point pour fermer","success");
+  }
+};
+
+map.on('click', (e)=>{
+  if(!drawing) return;
+  const ll = e.latlng;
+  currentPoints.push([ll.lat, ll.lng]);
+  if(tempLine) map.removeLayer(tempLine);
+  if(currentPoints.length>1){
+    tempLine = L.polyline(currentPoints,{color:'#22c55e',weight:3,dashArray:'6,6'}).addTo(map);
+  }
+  L.circleMarker(ll,{radius:5,color:'#22c55e',fillColor:'#22c55e',fillOpacity:1}).addTo(map);
+  if(currentPoints.length>=3){
+    const first = currentPoints[0];
+    const d = Math.hypot(ll.lat-first[0], ll.lng-first[1])*111000;
+    if(d<20){
+      currentPoints.push(first);
+      finishPolygon();
+    }
+  }
+});
+
+function finishPolygon(){
+  drawing = false;
+  document.getElementById("drawBtn").classList.remove("active");
+  if(tempLine){ map.removeLayer(tempLine); tempLine=null; }
+  const gj = {
+    type:"Polygon",
+    coordinates:[currentPoints.map(p=>[p[1],p[0]])]
+  };
+  drawnLayer = L.geoJSON(gj,{
+    style:{color:'#22c55e',weight:3,fillColor:'#22c55e',fillOpacity:.25}
+  }).addTo(map);
+  map.fitBounds(drawnLayer.getBounds(),{padding:[40,40]});
+  toast(LANG==="ar"?"تم رسم الحقل ✅":"Parcelle dessinée ✅","success");
+}
+
+document.getElementById("clearBtn").onclick = ()=>{
+  if(drawnLayer){ map.removeLayer(drawnLayer); drawnLayer=null; }
+  currentPoints = [];
+  document.getElementById("results").style.display="none";
+};
+
+document.getElementById("redrawBtn").onclick = ()=>{
+  document.getElementById("clearBtn").click();
+  document.getElementById("drawBtn").click();
+  document.getElementById("platform").scrollIntoView({behavior:'smooth'});
+};
+
+/* ================= Analyze ================= */
+document.getElementById("analyzeBtn").onclick = analyze;
+
+async function analyze(){
+  if(!drawnLayer){ toast(I18N[LANG]["toast.draw"],"error"); return; }
+  const gj = drawnLayer.toGeoJSON().geometry;
+  document.getElementById("loader").classList.add("active");
+  try{
+    const res = await fetch("/api/analyze",{
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body: JSON.stringify({geometry:gj})
+    });
+    const data = await res.json();
+    document.getElementById("loader").classList.remove("active");
+    if(!data.ok){ toast(data.message?.[LANG] || I18N[LANG]["toast.err"],"error"); return; }
+    renderResults(data);
+    toast(I18N[LANG]["toast.ok"],"success");
+  }catch(e){
+    document.getElementById("loader").classList.remove("active");
+    toast(I18N[LANG]["toast.err"],"error");
+  }
+}
+
+/* ================= Render ================= */
+let lastData = null, tsChart = null;
+function renderResults(d){
+  lastData = d;
+  document.getElementById("results").style.display="block";
+  document.getElementById("results").scrollIntoView({behavior:'smooth'});
+
+  // Subtitle
+  document.getElementById("resSubtitle").textContent =
+    LANG==="ar" ? `تحليل لشهر ${d.month} — مساحة ${d.area_ha} هكتار`
+                : `Analyse pour ${d.month} — ${d.area_ha} ha`;
+
+  // Prediction
+  const p = d.prediction;
+  const badge = document.getElementById("predBadge");
+  badge.className = "pred-badge "+p.level;
+  badge.textContent = p.label[LANG];
+  document.getElementById("predSummary").textContent = p.summary[LANG];
+  const conf = Math.round(p.confidence*100);
+  document.getElementById("confText").textContent = conf+"%";
+  document.getElementById("confFill").style.width = conf+"%";
+  document.getElementById("areaText").textContent = d.area_ha+" ha";
+  document.getElementById("monthText").textContent = d.month;
+
+  // Indicators
+  const grid = document.getElementById("indGrid");
+  grid.innerHTML = "";
+  d.indicators.forEach(i=>{
+    const el = document.createElement("div");
+    el.className = "ind "+i.status;
+    el.innerHTML = `
+      <div class="dot"></div>
+      <div class="t">${i.title[LANG]}</div>
+      <div class="v">${i.value} <small style="color:var(--muted);font-size:13px">${i.unit}</small></div>
+      <div class="n">${i.text[LANG]}</div>
+    `;
+    grid.appendChild(el);
+  });
+
+  // Recommendations
+  const recs = d.recommendations[LANG] || [];
+  const rl = document.getElementById("recList");
+  rl.innerHTML = "";
+  recs.forEach(r=>{
+    const li = document.createElement("li");
+    li.innerHTML = `<i class="fa-solid fa-check-circle"></i><span>${r}</span>`;
+    rl.appendChild(li);
+  });
+
+  // Warnings
+  const wc = document.getElementById("warnCard");
+  const wl = document.getElementById("warnList");
+  wl.innerHTML = "";
+  if(d.warnings && d.warnings.length){
+    wc.style.display="block";
+    d.warnings.forEach(w=>{
+      const el = document.createElement("div");
+      el.className="warn-item";
+      el.innerHTML = `<i class="fa-solid fa-triangle-exclamation"></i><span>${w[LANG]}</span>`;
+      wl.appendChild(el);
+    });
+  }else wc.style.display="none";
+
+  // Chart
+  renderChart(d.series);
+}
+
+function renderChart(s){
+  const ctx = document.getElementById("tsChart").getContext("2d");
+  if(tsChart) tsChart.destroy();
+  const labels = s.labels.map(l=>{
+    const [y,m] = l.split("-");
+    return LANG==="ar" ? `${m}/${y.slice(2)}` : l;
+  });
+  tsChart = new Chart(ctx,{
+    type:"line",
+    data:{
+      labels,
+      datasets:[
+        {label:"NDVI "+(LANG==="ar"?"الحالي":"actuel"),data:s.ndvi.current,borderColor:"#22c55e",backgroundColor:"rgba(34,197,94,.15)",tension:.35,fill:true},
+        {label:"NDVI "+(LANG==="ar"?"المعتاد":"normal"),data:s.ndvi.normal,borderColor:"#94a3b8",borderDash:[5,5],tension:.35,fill:false},
+        {label:"SMAP "+(LANG==="ar"?"الحالي":"actuel"),data:s.smap.current,borderColor:"#3b82f6",backgroundColor:"rgba(59,130,246,.1)",tension:.35,yAxisID:"y1"},
+      ]
+    },
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      plugins:{legend:{labels:{color:"#e6edf7"}}},
+      scales:{
+        x:{ticks:{color:"#94a3b8"},grid:{color:"rgba(255,255,255,.05)"}},
+        y:{ticks:{color:"#94a3b8"},grid:{color:"rgba(255,255,255,.05)"},title:{display:true,text:"NDVI",color:"#94a3b8"}},
+        y1:{position:"right",ticks:{color:"#94a3b8"},grid:{drawOnChartArea:false},title:{display:true,text:"SMAP (m³/m³)",color:"#94a3b8"}}
+      }
+    }
+  });
+}
+
+/* ================= PDF ================= */
+document.getElementById("downloadPdf").onclick = exportPDF;
+document.getElementById("pdfBtn").onclick = exportPDF;
+
+async function exportPDF(){
+  if(!lastData){ toast(LANG==="ar"?"قم بتحليل حقل أولاً":"Analysez d'abord une parcelle","error"); return; }
+  toast(I18N[LANG]["toast.pdf"],"success");
+
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({unit:"mm",format:"a4"});
+  const W = doc.internal.pageSize.getWidth();
+
+  // Header
+  doc.setFillColor(15,157,88);
+  doc.rect(0,0,W,28,"F");
+  doc.setTextColor(255,255,255);
+  doc.setFontSize(20); doc.setFont("helvetica","bold");
+  doc.text("AgroRisk v2 — Rapport d'analyse", 14, 18);
+  doc.setFontSize(10); doc.setFont("helvetica","normal");
+  doc.text(new Date().toLocaleDateString(), W-40, 18);
+
+  // Summary box
+  let y = 36;
+  doc.setFillColor(240,253,244);
+  doc.roundedRect(14, y, W-28, 32, 3, 3, "F");
+  doc.setTextColor(20,83,45);
+  doc.setFontSize(14); doc.setFont("helvetica","bold");
+  doc.text("Diagnostic: " + lastData.prediction.label.fr, 20, y+12);
+  doc.setFontSize(10); doc.setFont("helvetica","normal");
+  doc.setTextColor(60,60,60);
+  doc.text(lastData.prediction.summary.fr, 20, y+22, {maxWidth:W-48});
+  y += 40;
+
+  // Meta
+  doc.setTextColor(100,100,100);
+  doc.setFontSize(10);
+  doc.text(`Mois: ${lastData.month}   |   Surface: ${lastData.area_ha} ha   |   Confiance: ${Math.round(lastData.prediction.confidence*100)}%`, 14, y);
+  y += 10;
+
+  // Indicators table
+  doc.setTextColor(20,20,20);
+  doc.setFontSize(13); doc.setFont("helvetica","bold");
+  doc.text("Indicateurs", 14, y); y+=6;
+  doc.setFillColor(15,157,88); doc.rect(14,y,W-28,8,"F");
+  doc.setTextColor(255,255,255); doc.setFontSize(10);
+  doc.text("Indicateur", 16, y+5.5);
+  doc.text("Valeur", 90, y+5.5);
+  doc.text("Statut", 140, y+5.5);
+  y+=8;
+  doc.setTextColor(40,40,40); doc.setFont("helvetica","normal");
+  lastData.indicators.forEach((ind,i)=>{
+    doc.setFillColor(...(i%2 ? [248,250,252] : [255,255,255]));
+    doc.rect(14,y,W-28,7,"F");
+    doc.text(ind.title.fr, 16, y+5);
+    doc.text(ind.value+" "+ind.unit, 90, y+5);
+    doc.setTextColor(...(ind.status==="good" ? [22,163,74] : ind.status==="warn" ? [180,100,10] : [200,50,10]));
+    doc.text(ind.status.toUpperCase(), 140, y+5);
+    doc.setTextColor(40,40,40);
+    y+=7;
+  });
+  y+=6;
+
+  // Recommendations
+  if(y > 220){ doc.addPage(); y=20; }
+  doc.setFontSize(13); doc.setFont("helvetica","bold");
+  doc.setTextColor(20,20,20);
+  doc.text("Recommandations", 14, y); y+=6;
+  doc.setFont("helvetica","normal"); doc.setFontSize(10);
+  (lastData.recommendations.fr||[]).forEach((r,i)=>{
+    if(y>275){ doc.addPage(); y=20; }
+    doc.setTextColor(15,157,88); doc.text("•", 16, y);
+    doc.setTextColor(40,40,40); doc.text(r, 20, y, {maxWidth:W-40});
+    y+=6;
+  });
+
+  // Warnings
+  if(lastData.warnings && lastData.warnings.length){
+    y+=4;
+    if(y>250){ doc.addPage(); y=20; }
+    doc.setFontSize(13); doc.setFont("helvetica","bold");
+    doc.setTextColor(180,83,9);
+    doc.text("Avertissements", 14, y); y+=6;
+    doc.setFont("helvetica","normal"); doc.setFontSize(10);
+    lastData.warnings.forEach(w=>{
+      if(y>275){ doc.addPage(); y=20; }
+      doc.setTextColor(180,83,9); doc.text("⚠", 16, y);
+      doc.setTextColor(80,60,20); doc.text(w.fr, 20, y, {maxWidth:W-40});
+      y+=6;
+    });
+  }
+
+  // Footer
+  const pages = doc.internal.getNumberOfPages();
+  for(let i=1;i<=pages;i++){
+    doc.setPage(i);
+    doc.setFontSize(8); doc.setTextColor(150,150,150);
+    doc.text(`AgroRisk v2 — Maghnia — Page ${i}/${pages}`, 14, 290);
+  }
+
+  doc.save(`AgroRisk_${lastData.month}_${lastData.area_ha}ha.pdf`);
+}
+
+/* ================= JSON download ================= */
+document.getElementById("downloadJson").onclick = ()=>{
+  if(!lastData) return;
+  const blob = new Blob([JSON.stringify(lastData,null,2)],{type:"application/json"});
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = `agrorisk_${lastData.month}.json`;
+  a.click();
+};
+
+/* ================= Toast ================= */
+function toast(msg, type="success"){
+  const t = document.getElementById("toast");
+  t.textContent = msg;
+  t.className = "toast show "+type;
+  setTimeout(()=>t.classList.remove("show"), 3500);
+}
+
+/* ================= Init ================= */
+applyLang();
+</script>
+</body>
+</html>
