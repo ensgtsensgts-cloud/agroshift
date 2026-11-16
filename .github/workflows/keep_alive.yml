@@ -1,0 +1,15 @@
+name: Keep Render Awake
+
+on:
+  schedule:
+    - cron: '*/10 * * * *'
+  workflow_dispatch:
+  push:
+    branches: [ main ]
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping AgroShift sur Render
+        run: curl -s -L --max-time 60 https://agroshift-el90.onrender.com/ > /dev/null
